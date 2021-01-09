@@ -174,7 +174,9 @@
                                     &key
                                       (protocol +wechat-api-protocol+)
                                       (host +wechat-api-host+)
-                                      (uri "/cgi-bin/token"))
+                                      (uri "/cgi-bin/token")
+                                      proxy
+                                      proxy-basic-authorization)
   "Return access_token\(string\).
   API doc of Getting Access Token: https://developers.weixin.qq.com/doc/offiaccount/Basic_Information/Get_access_token.html
   IMPORTANT NOTE: Before calling the API, you need to log in to the Weixin Official Accounts Platform, and go to Development > Basic Settings to add the server IP address to the IP whitelist; otherwise it will not be called successfully."
@@ -185,7 +187,9 @@
                                    uri)
                            :parameters (list (cons "grant_type" "client_credential")
                                              (cons "appid" app-id)
-                                             (cons "secret" app-secret)))
+                                             (cons "secret" app-secret))
+                           :proxy proxy
+                           :proxy-basic-authorization proxy-basic-authorization)
     (declare (ignore headers uri stream must-close-p status-text))
     (let ((json (jsown:parse (babel:octets-to-string data :encoding :utf-8))))
       (if (eq 200 status-code)
@@ -219,6 +223,16 @@
     :initarg :auto-refresh-access-token-p
     :initform t
     :reader auto-refresh-access-token-p)
+   (proxy
+    :initarg :proxy
+    :initform nil
+    :accessor proxy
+    :documentation "e.g. '\(\"127.0.0.1\" 8080\)")
+   (proxy-basic-authorization
+    :initarg :proxy-basic-authorization
+    :initform nil
+    :accessor proxy-basic-authorization
+    :documentation "e.g. '\(\"username\" \"password\"\)")
    (encoding-aes-key
     :initarg :encoding-aes-key
     :initform nil
@@ -232,8 +246,11 @@
   (declare (ignore args))
   (flet ((init-access-token ()
            (setf (slot-value client 'access-token)
-                 (wechat-api-get-access-token (app-id client)
-                                              (app-secret client)))))
+                 (wechat-api-get-access-token
+                  (app-id client)
+                  (app-secret client)
+                  :proxy (proxy client)
+                  :proxy-basic-authorization (proxy-basic-authorization client)))))
     (init-access-token)
     (when (slot-value client 'auto-refresh-access-token-p)
       ;; refresh access-token every hour
@@ -251,11 +268,15 @@
                                              &key
                                                (auto-refresh-access-token-p t)
                                                encoding-aes-key
-                                               server-token)
+                                               server-token
+                                               proxy
+                                               proxy-basic-authorization)
   (make-instance 'wechat-official-accounts-client
                  :app-id app-id
                  :app-secret app-secret
                  :auto-refresh-access-token-p auto-refresh-access-token-p
+                 :proxy proxy
+                 :proxy-basic-authorization proxy-basic-authorization
                  :encoding-aes-key encoding-aes-key
                  :server-token server-token))
 
@@ -524,7 +545,9 @@
                                      ("type" type)
                                      ("offset" offset)
                                      ("count" count)))
-                         :force-binary t)
+                         :force-binary t
+                         :proxy (proxy client)
+                         :proxy-basic-authorization (proxy-basic-authorization client))
     :encoding :utf-8)))
 
 (defmethod message-custom-send ((client wechat-official-accounts-client) to-user message
@@ -546,7 +569,9 @@
                                      ("msgtype" msg-type)
                                      (msg-type message)))
                          :force-binary t
-                         :external-format-out :utf-8)
+                         :external-format-out :utf-8
+                         :proxy (proxy client)
+                         :proxy-basic-authorization (proxy-basic-authorization client))
     :encoding :utf-8)))
 
 (defmethod menu-create ((client wechat-official-accounts-client) button-list
@@ -564,6 +589,8 @@
                                    (jsown:new-js
                                      ("button" button-list)))
                          :force-binary t
-                         :external-format-out :utf-8)
+                         :external-format-out :utf-8
+                         :proxy (proxy client)
+                         :proxy-basic-authorization (proxy-basic-authorization client))
     :encoding :utf-8)))
 
